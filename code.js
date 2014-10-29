@@ -7,7 +7,7 @@ KANJI += '澤籠';
 KANJI = KANJI + PRIMITIVES;
 
 var kanji2number = {};
-_.each(KANJI.split(""), function(k, i) { kanji2number[k] = i+1; });
+_.each(KANJI.split(""), function(k, i) { kanji2number[k] = i + 1; });
 
 var _response;
 var eidsarr;
@@ -19,11 +19,14 @@ var DONTINCLUDE = "洛或妾舜曼竹奄坐勿叩屯巽昏晃此";
 var MIMIPRIMITIVES =
     "升貝勺千舌刀召丁肖兄寺占里林右莫苗各軍享丸周吾炎制\
 衣云童匕乞曽羽廷麻忍志義舎旨圭台穴波旦呈列則吏更憂斤矢弔射孝交祭帝吉系県令\
-勇宛官凶辛亥責害兼門丙景彦斉黄般呉免敬辰鬼尊刃酋" + "昌旧胡亘朋壮喬昆竜串荒戒乃";
+勇宛官凶辛亥責害兼門丙景彦斉黄般呉免敬辰鬼尊刃酋" +
+    "昌旧胡亘朋壮喬昆竜串荒戒乃";
 MIMIPRIMITIVES += DONTINCLUDE;
-// MIMIPRIMITIVES = "";
+MIMIPRIMITIVES = "";
 
 m = m + MIMIPRIMITIVES;
+
+var d3Tree = d3.layout.tree().children(function(d){return d.chillenz});
 
 d3.xhr('eids.txt', 'text/plain', function(err, req) {
     if (err) {
@@ -40,23 +43,33 @@ d3.xhr('eids.txt', 'text/plain', function(err, req) {
     // Sort in Heisig order (RTK1 vs 3 split :(
     m = _.sortBy(m.split(""), function(s) { return kanji2number[s]; }).join("");
 
-
     // mimi kanji that could be simplified by pruning non-mimi
     var mPrim = PRIMITIVES + m;
     var noMatchRTK13VsMimi = compareStringsToPrune(m, mPrim);
     var carets2brackets =
         function(s) { return s.replace(/</g, "[").replace(/>/g, "]"); };
-    var indent2oneline = function(s) {
-        return s.replace(/\n +/g, '');
-    };
+    var indent2oneline = function(s) { return s.replace(/\n +/g, ''); };
     if (noMatchRTK13VsMimi.length > 0) {
+
         d3.select("#cont")
             .selectAll("div")
             .data(noMatchRTK13VsMimi)
             .enter()
             .append("div")
             .html(function(d, i) {
-            return "<hr>" + d + ": #" + kanji2number[d] + "<br>" +
+            var mimiPruned = d3Tree(
+                convertIndentToJSON(prune(db[d].indent, m + PRIMITIVES)));
+            var fullyPruned = d3Tree(convertIndentToJSON(prune(db[d].indent)));
+            var diffs = _.unique(_.difference(_.pluck(mimiPruned, 'namae'),
+                                              _.pluck(fullyPruned, 'namae')));
+
+            var sortedNodes = _.sortBy(
+                _.flatten(_.map(diffs, function(name){return _.where(
+                                           mimiPruned, {'namae' : name})})),
+                'depth');
+            var linkBreak = "(break at " + sortedNodes[0].namae + ")";
+
+            return "<hr>" + d + ": #" + kanji2number[d] + linkBreak + "<br>" +
                    carets2brackets(prune(db[d].indent)) + "<br><br>" +
                    carets2brackets(prune(db[d].indent, mPrim));
         }).style("white-space", "pre");
@@ -71,7 +84,68 @@ d3.xhr('eids.txt', 'text/plain', function(err, req) {
                    indent2oneline(carets2brackets(prune(db[d].indent, mPrim)));
         }).style("white-space", "pre");
     }
+
 });
+
+function getLeaves(indented) {
+    return _.pluck(_.filter(d3Tree(convertIndentToJSON(indented)), function(d) {
+                       return typeof d.chillenz === 'undefined';
+                   }),
+                   'namae');
+}
+
+function convertIndentToJSON(indented) {
+    function findNumLeadingSpaces(s) { return s.match(/ */)[0].length; }
+    function repeat(s, n) {
+        return _.range(n).map(function() { return s; }).join("");
+    }
+
+    var arr = indented.split("\n");
+    var numSpaces = _.map(arr, findNumLeadingSpaces);
+    // requires last cahracter to be a newline, so arr[-1] is ''
+    return JSON.parse(
+        _.map(_.zip(arr, _.range(arr.length)), function(di) {
+                  var d = '"' + di[0].replace(/ /g, "") + '", ', i = di[1];
+                  if (i < arr.length - 1) {
+                      var diff = numSpaces[i] - numSpaces[i + 1];
+                      if (diff < 0) {
+                          return '{"namae": ' + d + '"chillenz": [';
+                      } else if (diff > 0) {
+                          return '{"namae": ' + d + '}' +
+                                 repeat("]}, ", diff / 2);
+                      } else {
+                          return '{"namae": ' + d + '}, ';
+                      }
+                  }
+                  return "";
+              })
+            .join("")
+            .replace(/, (\}|\]|$)/g, "$1"));
+}
+
+function convertIndentToJSONArray(indented) {
+    function findNumLeadingSpaces(s) { return s.match(/ */)[0].length; }
+    function repeat(s, n) {
+        return _.range(n).map(function() { return s; }).join("");
+    }
+
+    var arr = indented.split("\n");
+    var numSpaces = _.map(arr, findNumLeadingSpaces);
+    // requires last cahracter to be a newline, so arr[-1] is ''
+    return JSON.parse(
+        _.map(_.zip(arr, _.range(arr.length)), function(di) {
+                  var d = '"' + di[0].replace(/ /g, "") + '", ', i = di[1];
+                  if (i == arr.length - 1) {
+                      return "";
+                  } else {
+                      var diff = numSpaces[i] - numSpaces[i + 1];
+                      return (diff < 0 ? "[" : "") + d +
+                             (diff > 0 ? repeat("], ", diff / 2) : "");
+                  }
+              })
+            .join("")
+            .replace(/, (\]|$)/g, "$1"));
+}
 
 function compareStringsToPrune(mimi, s1, s2) {
     return _.filter(mimi.split(""), function(s) {
