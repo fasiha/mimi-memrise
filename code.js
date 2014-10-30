@@ -1,22 +1,38 @@
+var sortByRTK = function(str) {
+    return _.sortBy(str, function(k) { return kanji2number[k]; }).join("")
+};
+
+var combineWithMimiKanji = function(core) {
+    return _.sortBy(_.unique((core + mimiKanji).split("")),
+                    function(k) { return kanji2number[k]; }).join("");
+};
+// 789 (790th would be 々)
+var mimiCore500 = combineWithMimiKanji(core1503.slice(0, 500));
+// 1542
+var mimiCoreAll = combineWithMimiKanji(core1503);
+
 // Decide what list of Core5k-kanji we're operating on, and any other kanji NOT
 // in those lists that are used as building blocks by those in the list.
 var MIMIPRIMITIVES;
 var m;
-if (!false) {
+if (false) {
+    // 1631 kanji
+    m = mimiCoreAll;
     // Found using kanjiForPrimitives, and sorted according to RTK13 number
     MIMIPRIMITIVES =
-        "吾朋昌亘旧升貝勺召肖圭灰苗呈享亭壮帝匕昆乞荒曽廷竜麻忍串憂戒乃吏隻叔" +
-        "采" +
-        "允丙勿尉斤斥唐之弔孝諸畜系卸宛凶亥奉垂票侯彦甚呉寅辰屯此奄呑尤或尭甫" +
-        "曼云喬莫叩呆庄洛逢愈晃昏胡妾筑坐朔巽酋舜龍而";
-    m = mimi1503;
+        "昌升貝旧勺召肖胡圭亘朋莫苗洛享吾或壮晃云喬帝匕昆乞曽竜此廷麻忍串妾戒" +
+        "乃" +
+        "隻叔采允灰舜曼呈尤庄筑亭吏憂呆奄丙坐勿尉斤斥唐而尭之弔孝畜系卸叩宛酋" +
+        "凶屯亥逢奉垂票侯彦甚巽昏甫呉朔寅辰龍愈呑";
+
 } else {
+    // 890 kanji
+    var m = mimiCore500;
     MIMIPRIMITIVES =
         "吾旦千舌升丸占貝勺右刀刃召則丁兄肖圭寺炎里林苗呈各軍享景舎周吉敬衣制" +
         "帝" +
         "童匕旨乞曽廷県羽麻忍志憂義吏更台波列竹丙勿祭斤矢弔射孝官交穴系令勇宛" +
         "尊凶辛亥責害兼門彦斉黄般呉免辰鬼屯奄或曼云莫叩洛昏妾坐巽酋舜";
-    var m = mimi790;
 }
 m = m + MIMIPRIMITIVES;
 
@@ -24,17 +40,9 @@ m = m + MIMIPRIMITIVES;
 commonPatterns = "喿";
 
 // These are global primitives that we don't want to break down, ever. Note that
-// most of these are non-kanji radicals.
+// these are non-kanji radicals.
 var PRIMITIVES = "艹亠聿戈𢦏巛巜⺀䒑儿昜翟𠘨兑爫廾𠫓豕𦍌习殳禾氺";
-
-// These are kanji that are NOT in the RTK13 list that might be in the
-// Mimi/Core5k lists.
-KANJI += '澤籠';
-KANJI = KANJI + PRIMITIVES;
-
-// Here's a dictionary converting kanji to extra-RTK13 numbers
-var kanji2number = {};
-_.each(KANJI.split(""), function(k, i) { kanji2number[k] = i + 1; });
+KANJI = PRIMITIVES + KANJI;
 
 // Here are some globals that are useful
 var _response;
@@ -56,7 +64,8 @@ d3.xhr('eids.txt', 'text/plain', function(err, req) {
         db[match[1]] = {all : match[2], indent : match[3]};
     });
     mimidb = _.map(m.split(""), function(s) { return db[s]; });
-    // Sort in Heisig order (RTK1 vs 3 split :(
+    // Sort in Heisig order (RTK1 vs 3 split :(), with non-RTK kanji placed at
+    // the end
     m = _.sortBy(m.split(""), function(s) { return kanji2number[s]; }).join("");
 
     // mimi kanji that could be simplified by pruning non-mimi
@@ -64,8 +73,9 @@ d3.xhr('eids.txt', 'text/plain', function(err, req) {
     var noMatchRTK13VsMimi = compareStringsToPrune(m, mPrim);
 
     var carets2brackets =
-        function(s) { return s.replace(/</g, "[").replace(/>/g, "]"); };
+        function(s) { return s.replace(/</g, "&lt;").replace(/>/g, "&gt;"); };
     var indent2oneline = function(s) { return s.replace(/\n +/g, ''); };
+    var remNewline = function(s) { return s.replace(/\n/g, ""); }
 
     if (noMatchRTK13VsMimi.length > 0) {
         // Find the kanji that differ between the RTK13-fully-pruned tree and
@@ -80,10 +90,11 @@ d3.xhr('eids.txt', 'text/plain', function(err, req) {
                                               _.pluck(fullyPruned, 'namae')));
 
             // Sort these nodes by depth.
-            var sortedNodes = _.sortBy(
-                _.flatten(_.map(diffs, function(name) {return _.where(
-                                           mimiPruned, {'namae' : name});})),
-                'depth');
+            var sortedNodes =
+                _.sortBy(_.flatten(_.map(diffs, function(name) {
+                             return _.where(mimiPruned, {'namae' : name});
+                         })),
+                         'depth');
 
             // Store the minimum-depth node. Robustness TODO: return all nodes
             // at the lowest depth instead of just one.
@@ -111,15 +122,20 @@ d3.xhr('eids.txt', 'text/plain', function(err, req) {
                    carets2brackets(prune(db[d].indent)) + "<br><br>" +
                    carets2brackets(prune(db[d].indent, mPrim));
         }).style("white-space", "pre");
-    } else {
+    }
+    else {
         d3.select("#cont")
             .selectAll("div")
             .data(m.split(""))
             .enter()
             .append("div")
             .html(function(d, i) {
-            return "#" + kanji2number[d] + ": " +
-                   indent2oneline(carets2brackets(prune(db[d].indent, mPrim)));
+            var eids = remNewline(
+                indent2oneline(carets2brackets(prune(db[d].indent, mPrim))));
+            return d + " (#" + kanji2number[d] + "): " +
+                   getLeaves(convertIndentToJSON(prune(db[d].indent, mPrim)))
+                       .join("") +
+                   " ... " + eids;
         }).style("white-space", "pre");
     }
 
@@ -129,7 +145,7 @@ function plot(json) {
     var width = 960, height = 200;
 
     var tree = d3.layout.tree().size([ height, width - 160 ]).children(
-        function(d){return d.chillenz;});
+        function(d) { return d.chillenz; });
 
     var diagonal =
         d3.svg.diagonal().projection(function(d) { return [ d.y, d.x ]; });
@@ -159,8 +175,7 @@ function plot(json) {
             .attr("transform",
                   function(d) { return "translate(" + d.y + "," + d.x + ")"; });
 
-        node.append("circle")
-            .attr("r", 4.5);
+    node.append("circle").attr("r", 4.5);
 
     node.append("text")
         .attr("dx", function(d) { return d.children ? -8 : 8; })
@@ -172,9 +187,8 @@ function plot(json) {
     d3.select(self.frameElement).style("height", height + "px");
 }
 
-
-function getLeaves(indented) {
-    return _.pluck(_.filter(d3Tree(convertIndentToJSON(indented)), function(d) {
+function getLeaves(json) {
+    return _.pluck(_.filter(d3Tree(json), function(d) {
                        return typeof d.chillenz === 'undefined';
                    }),
                    'namae');
@@ -273,4 +287,13 @@ function prune(indentedString, stringsToPrune) {
         }
     }
     return arr.join('\n');
+}
+
+function getOnline(url) {
+    d3.xhr(url, 'text/plain', function(err, req) {
+        if (err) {
+            return console.error(err);
+        }
+        _response = req.responseText;
+    });
 }
