@@ -1,4 +1,3 @@
-
 // Decide what list of Core5k-kanji we're operating on, and any other kanji NOT
 // in those lists that are used as building blocks by those in the list.
 var MIMIPRIMITIVES;
@@ -82,8 +81,8 @@ d3.xhr('eids.txt', 'text/plain', function(err, req) {
 
             // Sort these nodes by depth.
             var sortedNodes = _.sortBy(
-                _.flatten(_.map(diffs, function(name){return _.where(
-                                           mimiPruned, {'namae' : name})})),
+                _.flatten(_.map(diffs, function(name) {return _.where(
+                                           mimiPruned, {'namae' : name});})),
                 'depth');
 
             // Store the minimum-depth node. Robustness TODO: return all nodes
@@ -125,17 +124,17 @@ d3.xhr('eids.txt', 'text/plain', function(err, req) {
     }
 
 });
-/*
+
 function plot(json) {
     var width = 960, height = 200;
 
     var tree = d3.layout.tree().size([ height, width - 160 ]).children(
-        function(d){return d.chillenz});
+        function(d){return d.chillenz;});
 
     var diagonal =
         d3.svg.diagonal().projection(function(d) { return [ d.y, d.x ]; });
 
-    var svg = d3.select("body")
+    var svg = d3.select("#viz")
                   .insert("svg", ":first-child")
                   .attr("width", width)
                   .attr("height", height)
@@ -158,7 +157,7 @@ function plot(json) {
             .append("g")
             .attr("class", "node")
             .attr("transform",
-                  function(d) { return "translate(" + d.y + "," + d.x + ")"; })
+                  function(d) { return "translate(" + d.y + "," + d.x + ")"; });
 
         node.append("circle")
             .attr("r", 4.5);
@@ -172,7 +171,7 @@ function plot(json) {
 
     d3.select(self.frameElement).style("height", height + "px");
 }
-*/
+
 
 function getLeaves(indented) {
     return _.pluck(_.filter(d3Tree(convertIndentToJSON(indented)), function(d) {
