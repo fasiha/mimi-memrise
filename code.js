@@ -6,9 +6,9 @@ var combineWithMimiKanji = function(core) {
     return _.sortBy(_.unique((core + mimiKanji).split("")),
                     function(k) { return kanji2number[k]; }).join("");
 };
-// 789 (790th would be 々)
+// 790
 var mimiCore500 = combineWithMimiKanji(core1503.slice(0, 500));
-// 1542
+// 1541
 var mimiCoreAll = combineWithMimiKanji(core1503);
 
 // Decide what list of Core5k-kanji we're operating on, and any other kanji NOT
@@ -17,7 +17,7 @@ var MIMIPRIMITIVES;
 var m;
 if (false) {
     // 1631 kanji
-    m = mimiCoreAll;
+    mimiChosen = mimiCoreAll;
     // Found using kanjiForPrimitives, and sorted according to RTK13 number
     MIMIPRIMITIVES =
         "昌升貝旧勺召肖胡圭亘朋莫苗洛享吾或壮晃云喬帝匕昆乞曽竜此廷麻忍串妾戒" +
@@ -26,22 +26,27 @@ if (false) {
         "凶屯亥逢奉垂票侯彦甚巽昏甫呉朔寅辰龍愈呑";
 
 } else {
-    // 890 kanji
-    var m = mimiCore500;
+    // 918 kanji
+    var mimiChosen = mimiCore500;
+    // Kanji components that need to be known to make full-RTK-pruned EIDS trees match mimi-only-pruned trees
     MIMIPRIMITIVES =
         "吾旦千舌升丸占貝勺右刀刃召則丁兄肖圭寺炎里林苗呈各軍享景舎周吉敬衣制" +
         "帝" +
         "童匕旨乞曽廷県羽麻忍志憂義吏更台波列竹丙勿祭斤矢弔射孝官交穴系令勇宛" +
         "尊凶辛亥責害兼門彦斉黄般呉免辰鬼屯奄或曼云莫叩洛昏妾坐巽酋舜";
+
+    // Kanji components that are used as leaf nodes
+    MIMIPRIMITIVES += "寸頁乙兆巾欠虫己又皮臣尺甲斗廿弓酉豆皿央井亜角舟牙且巳巴卜";
+    MIMIPRIMITIVES = sortByRTK(MIMIPRIMITIVES);
 }
-m = m + MIMIPRIMITIVES;
+m = mimiChosen + MIMIPRIMITIVES;
 
 // Here are some commonly-occurring patterns...
 commonPatterns = "喿";
 
 // These are global primitives that we don't want to break down, ever. Note that
 // these are non-kanji radicals.
-var PRIMITIVES = "艹亠聿戈𢦏巛巜⺀䒑儿昜翟𠘨兑爫廾𠫓豕𦍌习殳禾氺";
+var PRIMITIVES = "艹亠聿戈𢦏巛巜⺀䒑儿昜翟𠘨兑爫廾𠫓豕𦍌习殳禾氺啇幺罙龷卄电夭厉戠歹㦮龸孚乂戌䖝𠦝𠮷𤴓";
 KANJI = PRIMITIVES + KANJI;
 
 // Here are some globals that are useful
@@ -130,16 +135,38 @@ d3.xhr('eids.txt', 'text/plain', function(err, req) {
             .enter()
             .append("div")
             .html(function(d, i) {
-            var eids = remNewline(
-                indent2oneline(carets2brackets(prune(db[d].indent, mPrim))));
-            return d + " (#" + kanji2number[d] + "): " +
-                   getLeaves(convertIndentToJSON(prune(db[d].indent, mPrim)))
-                       .join("") +
-                   " ... " + eids;
+
+            var kanji = (mimiChosen.indexOf(d) >= 0
+                             ? '<span class="kanji-in-mimi">'
+                             : '<span class="kanji-in-primitives">') + d + '</span>';
+
+            var pruned = prune(db[d].indent, mPrim);
+            var eids = remNewline(indent2oneline(carets2brackets(db[d].all)));
+            eids = '<span class="eids">' + eids + "</span>";
+
+            var leaves =
+                getLeaves(convertIndentToJSON(pruned)).map(function(c) {
+                var d =
+                    carets2brackets(c);  // Can add <> carets here if desired
+                if (m.indexOf(d) >= 0) {
+                    return '<span class="listed-kanji-component">' + d + "</span>";
+                } else if (db[c]) {
+                    return '<span class="rtk-plus-component">' + d + "</span>";
+                }
+                return d;
+            });
+            // leaves = carets2brackets(leaves.join(""));
+
+            return kanji + " : " + leaves + " ... " + eids +
+                   ' <span class="rtk-num">(#' + kanji2number[d] + ")</span>";
         }).style("white-space", "pre");
     }
 
 });
+
+function plotHelper(kanji) {
+    plot(convertIndentToJSON(prune(db[kanji].indent, m + PRIMITIVES)));
+}
 
 function plot(json) {
     var width = 960, height = 200;
